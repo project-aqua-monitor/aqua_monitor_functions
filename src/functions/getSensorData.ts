@@ -1,15 +1,36 @@
-import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
+import {
+  app,
+  HttpRequest,
+  HttpResponseInit,
+  InvocationContext,
+} from "@azure/functions";
+import { client, close, connect } from "../lib/database";
 
-export async function getSensorData(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
-    context.log(`Http function processed request for url "${request.url}"`);
+export async function getSensorData(
+  request: HttpRequest,
+  context: InvocationContext
+): Promise<HttpResponseInit> {
+  context.log(`Http function processed request for url "${request.url}"`);
 
-    const name = request.query.get('name') || await request.text() || 'world';
+  await connect();
+  const db = client.db("sensorData");
+  const collection = db.collection("data");
 
-    return { body: `Hello, ${name}!` };
-};
+  try {
+    const data = await collection.find().toArray()
+    return { body: JSON.stringify(data) };
+  } catch (err) {
+    context.log("Mongodb Error:", err);
+    return { body: "Error in fetching data" };
+  } finally {
+    close();
+  }
 
-app.http('getSensorData', {
-    methods: ['GET', 'POST'],
-    authLevel: 'anonymous',
-    handler: getSensorData
+  return { body: `Hello, ${name}!` };
+}
+
+app.http("getSensorData", {
+  methods: ["GET", "POST"],
+  authLevel: "anonymous",
+  handler: getSensorData,
 });

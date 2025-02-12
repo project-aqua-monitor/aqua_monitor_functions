@@ -1,16 +1,39 @@
-import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
-import { connect } from "../lib/database";
+import {
+  app,
+  HttpRequest,
+  HttpResponseInit,
+  InvocationContext,
+} from "@azure/functions";
+import { client, close, connect } from "../lib/database";
 
-export async function saveSensorData(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
-    context.log(`Http function processed request for url "${request.url}"`);
+export async function saveSensorData(
+  request: HttpRequest,
+  context: InvocationContext
+): Promise<HttpResponseInit> {
+  context.log(`Http function processed request for url "${request.url}"`);
 
-    await connect();
+  const body = request.body;
+  const _data = await body.getReader().read();
+  const data = JSON.parse(new TextDecoder().decode(_data.value));
 
-    return { body: 'Data saved' };
-};
+  await connect();
+  const db = client.db("sensorData");
+  const collection = db.collection("data");
 
-app.http('saveSensorData', {
-    methods: ['GET', 'POST'],
-    authLevel: 'anonymous',
-    handler: saveSensorData
+  try {
+    await collection.insertOne(data);
+  } catch (err) {
+    context.log(err);
+    return { body: "Error in saving data" };
+  } finally {
+    await close();
+  }
+
+  return { body: "Data saved" };
+}
+
+app.http("saveSensorData", {
+  methods: ["POST"],
+  authLevel: "anonymous",
+  handler: saveSensorData,
 });
